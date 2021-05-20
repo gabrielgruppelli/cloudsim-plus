@@ -32,7 +32,10 @@ import org.cloudbus.cloudsim.core.CloudSim;
 import org.cloudbus.cloudsim.datacenters.Datacenter;
 import org.cloudbus.cloudsim.datacenters.DatacenterSimple;
 import org.cloudbus.cloudsim.network.topologies.BriteNetworkTopology;
+import org.cloudbus.cloudsim.network.topologies.SimpleNetworkTopology;
 import org.cloudbus.cloudsim.network.topologies.NetworkTopology;
+import org.cloudbus.cloudsim.network.topologies.TopologicalGraph;
+import org.cloudbus.cloudsim.network.topologies.TopologicalLink;
 import org.cloudbus.cloudsim.hosts.Host;
 import org.cloudbus.cloudsim.hosts.HostSimple;
 import org.cloudbus.cloudsim.provisioners.PeProvisionerSimple;
@@ -93,7 +96,7 @@ public class UFPelExample1 {
         cloudSim = new CloudSim();
         datacenter = createDatacenter();
         broker = new DatacenterBrokerSimple(cloudSim);
-        configureNetwork();
+        // configureNetwork();
 
         vmList = createVms();
         cloudletList = createCloudlets();
@@ -165,14 +168,14 @@ public class UFPelExample1 {
         return list;
     }
 
-    /**
-     * Create network.
-     */
-    private void configureNetwork() {
-        //Configure network by mapping CloudSim entities to BRITE entities
-        NetworkTopology networkTopology = new BriteNetworkTopology();
-        cloudSim.setNetworkTopology(networkTopology);
-        networkTopology.addLink(broker, datacenter, 10, 1);
-        // networkTopology.addLink(datacenter, broker, 10.0, 1);
-    }
+    // /**
+    //  * Create network.
+    //  */
+    // private void configureNetwork() {
+    //     //Configure network by mapping CloudSim entities
+    //     NetworkTopology networkTopology = new SimpleNetworkTopology();
+    //     cloudSim.setNetworkTopology(networkTopology);
+    //     networkTopology.addLink(broker, datacenter, 10, 1);
+    //     // networkTopology.addLink(datacenter, broker, 10.0, 1);
+    // }
 }
