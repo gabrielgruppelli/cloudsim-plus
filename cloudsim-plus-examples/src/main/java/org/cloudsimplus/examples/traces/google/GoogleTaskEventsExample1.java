@@ -60,6 +60,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static org.cloudbus.cloudsim.util.Conversion.megaBytesToBytes;
+import static org.cloudbus.cloudsim.util.MathUtil.positive;
+
 /**
  * An example showing how to create Cloudlets (tasks) from a Google Task Events
  * Trace using a {@link GoogleTaskEventsTraceReader}. Then it uses a
@@ -112,7 +115,7 @@ public class GoogleTaskEventsExample1 {
     private static final int  VM_MIPS = 1000;
     private static final long VM_RAM = 500; //in Megabytes
     private static final long VM_BW = 100; //in Megabits/s
-    private static final long VM_SIZE = 1000; //in Megabytes
+    private static final long VM_SIZE_MB = 1000; //in Megabytes
 
     private final CloudSim simulation;
     private List<DatacenterBroker> brokers;
@@ -158,6 +161,12 @@ public class GoogleTaskEventsExample1 {
      * that will be called internally to actually create the Cloudlets.
      * This function is the {@link #createCloudlet(TaskEvent)}.*
      * </p>
+     *
+     * <p>
+     * If you want to improve simulation performance and use the same broker
+     * for all created cloudlets, avoiding the reader to create brokers based on the
+     * username field of the trace file, call {@link GoogleTaskEventsTraceReader#setDefaultBroker(DatacenterBroker)}.
+     * </p>
      */
     private void createCloudletsAndBrokersFromTraceFile() {
         final GoogleTaskEventsTraceReader reader =
@@ -189,12 +198,13 @@ public class GoogleTaskEventsExample1 {
         This is different from the CPU UtilizationModel, which is defined
         in the "task usage" trace files.
         */
-        final long pesNumber = event.actualCpuCores(VM_PES) > 0 ? event.actualCpuCores(VM_PES) : VM_PES;
+        final long pesNumber = positive(event.actualCpuCores(VM_PES), VM_PES);
 
-        final double maxRamUsagePercent = event.getResourceRequestForRam() > 0 ? event.getResourceRequestForRam() : Conversion.HUNDRED_PERCENT;
+        final double maxRamUsagePercent = positive(event.getResourceRequestForRam(), Conversion.HUNDRED_PERCENT);
         final UtilizationModelDynamic utilizationRam = new UtilizationModelDynamic(0, maxRamUsagePercent);
 
-        final long sizeInBytes = (long) Math.ceil(Conversion.megaBytesToBytes(event.getResourceRequestForLocalDiskSpace()*VM_SIZE + 1));
+        final double sizeInMB    = event.getResourceRequestForLocalDiskSpace() * VM_SIZE_MB + 1;
+        final long   sizeInBytes = (long) Math.ceil(megaBytesToBytes(sizeInMB));
         return new CloudletSimple(CLOUDLET_LENGTH, pesNumber)
             .setFileSize(sizeInBytes)
             .setOutputSize(sizeInBytes)
@@ -202,7 +212,6 @@ public class GoogleTaskEventsExample1 {
             .setUtilizationModelCpu(new UtilizationModelFull())
             .setUtilizationModelRam(utilizationRam);
     }
-
 
     /**
      * Process a "task usage" trace file from the Google Cluster Data that
@@ -266,7 +275,7 @@ public class GoogleTaskEventsExample1 {
 
     private Vm createVm(final int id) {
         //Uses a CloudletSchedulerTimeShared by default
-        return new VmSimple(VM_MIPS, VM_PES).setRam(VM_RAM).setBw(VM_BW).setSize(VM_SIZE);
+        return new VmSimple(VM_MIPS, VM_PES).setRam(VM_RAM).setBw(VM_BW).setSize(VM_SIZE_MB);
     }
 
     private void printCloudlets(final DatacenterBroker broker) {
