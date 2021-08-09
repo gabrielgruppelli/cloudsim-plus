@@ -64,7 +64,7 @@ public class UFPelCenarioBase {
     private static final int VM_BW = 10000; //in Megabits/s
     private static final int VM_STORAGE = 10000; //in Megabytes
 
-    private static final int CLOUDLETS = 20745;
+    private static final int CLOUDLETS = 25745;
     private static final int CLOUDLET_PES = 1;
     private static final int CLOUDLET_LENGTH = 2580;
 
@@ -125,6 +125,9 @@ public class UFPelCenarioBase {
         return new DatacenterSimple(cloudSim, hostList);
     }
 
+    /**
+     * Creates a list of Hosts.
+     */
     private Host createHost() {
         final List<Pe> peList = new ArrayList<>(HOST_PES);
         //List of Host's CPUs (Processing Elements, PEs)

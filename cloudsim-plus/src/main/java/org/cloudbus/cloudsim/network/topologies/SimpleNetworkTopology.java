@@ -13,7 +13,7 @@ public final class SimpleNetworkTopology implements NetworkTopology {
     private static final Logger LOGGER = LoggerFactory.getLogger(BriteNetworkTopology.class.getSimpleName());
 
     /**
-     * The BRITE id to use for the next node to be created in the network.
+     * The id to use for the next node to be created in the network.
      */
     private int nextIdx;
 

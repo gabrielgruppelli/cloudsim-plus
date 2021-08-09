@@ -31,13 +31,18 @@ import org.cloudbus.cloudsim.cloudlets.CloudletSimple;
 import org.cloudbus.cloudsim.core.CloudSim;
 import org.cloudbus.cloudsim.datacenters.Datacenter;
 import org.cloudbus.cloudsim.datacenters.DatacenterSimple;
+import org.cloudbus.cloudsim.network.topologies.BriteNetworkTopology;
+import org.cloudbus.cloudsim.network.topologies.SimpleNetworkTopology;
+import org.cloudbus.cloudsim.network.topologies.NetworkTopology;
+import org.cloudbus.cloudsim.network.topologies.TopologicalGraph;
+import org.cloudbus.cloudsim.network.topologies.TopologicalLink;
 import org.cloudbus.cloudsim.hosts.Host;
 import org.cloudbus.cloudsim.hosts.HostSimple;
 import org.cloudbus.cloudsim.provisioners.PeProvisionerSimple;
 import org.cloudbus.cloudsim.provisioners.ResourceProvisionerSimple;
 import org.cloudbus.cloudsim.resources.Pe;
 import org.cloudbus.cloudsim.resources.PeSimple;
-import org.cloudbus.cloudsim.schedulers.cloudlet.CloudletSchedulerTimeShared;
+import org.cloudbus.cloudsim.schedulers.cloudlet.CloudletSchedulerSpaceShared;
 import org.cloudbus.cloudsim.schedulers.vm.VmSchedulerTimeShared;
 import org.cloudbus.cloudsim.util.TimeUtil;
 import org.cloudbus.cloudsim.utilizationmodels.UtilizationModel;
@@ -52,55 +57,78 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
+public class UFPelCenarioBaseNetwork {
+    private static final int HOSTS = 1;
+    private static final int HOST_PES = 16;
+    private static final int HOST_RAM = 65536; //in Megabytes
 
-public class UFPelExample2 {
-    private static final int HOSTS = 3;
-    private static final int HOST_PES = 10;
+    private static final int HOST_PES_MIPS = 10000;
+    private static final int HOST_BW = 10000; //in Megabits/s
+    private static final int HOST_STORAGE = 10000; //in Megabytes
 
-    private static final int VMS = 4;
-    private static final int VM_PES = 4;
-    private static final int VM_MIPS = 1000;
+    private static final int VMS = 1;
+    private static final int VM_PES = 16;
+    private static final int VM_RAM = 65536; //in Megabytes
+    
+    private static final int VM_PES_MIPS = 10000;
+    private static final int VM_BW = 10000; //in Megabits/s
+    private static final int VM_STORAGE = 10000; //in Megabytes
 
-    private static final int CLOUDLETS = 41;
-    private static final int CLOUDLET_PES = 2;
-    private static final int CLOUDLET_LENGTH = 100000000;
+    private static final int CLOUDLETS = 86000;
+    private static final int CLOUDLET_PES = 1;
+    private static final int CLOUDLET_LENGTH = 2580;
 
-    private static final int SCHEDULING_INTERVAL = 300;
-
-    private final CloudSim simulation;
-    private DatacenterBroker broker0;
+    private final CloudSim cloudSim;
+    private DatacenterBroker broker;
     private List<Vm> vmList;
     private List<Cloudlet> cloudletList;
-    private Datacenter datacenter0;
+    private Datacenter datacenter;
 
     public static void main(String[] args) {
-        new UFPelExample2();
+        new UFPelCenarioBaseNetwork();
     }
 
-    private UFPelExample2() {
+    private UFPelCenarioBaseNetwork() {
         /*Enables just some level of log messages.
           Make sure to import org.cloudsimplus.util.Log;*/
         //Log.setLevel(ch.qos.logback.classic.Level.WARN);
 
         final double startSecs = TimeUtil.currentTimeSecs();
         System.out.printf("Simulation started at %s%n%n", LocalTime.now());
-        simulation = new CloudSim();
-        datacenter0 = createDatacenter();
-
-        //Creates a broker that is a software acting on behalf a cloud customer to manage his/her VMs and Cloudlets
-        broker0 = new DatacenterBrokerSimple(simulation);
+        cloudSim = new CloudSim();
+        datacenter = createDatacenter();
+        broker = new DatacenterBrokerSimple(cloudSim);
+        configureNetwork();
 
         vmList = createVms();
         cloudletList = createCloudlets();
-        broker0.submitVmList(vmList);
-        broker0.submitCloudletList(cloudletList);
+        broker.submitVmList(vmList);
+        broker.submitCloudletList(cloudletList);
 
-        simulation.start();
+        cloudSim.start();
 
-        final List<Cloudlet> finishedCloudlets = broker0.getCloudletFinishedList();
-        new CloudletsTableBuilder(finishedCloudlets).build();
+        final List<Cloudlet> finishedCloudlets = broker.getCloudletFinishedList();
+        // new CloudletsTableBuilder(finishedCloudlets).build();
+        System.out.printf("Simulação time : %.0f seconds%n", finishTime(finishedCloudlets));
         System.out.printf("Simulation finished at %s. Execution time: %.2f seconds%n", LocalTime.now(), TimeUtil.elapsedSeconds(startSecs));
+
+        System.out.println(getClass().getSimpleName() + " finished!");
     }
+
+    public double finishTime(List<Cloudlet> cl) {
+        Cloudlet lastCloudlet = cl.get(cl.size() - 1);
+        return roundTime(lastCloudlet, lastCloudlet.getFinishTime());
+    }
+
+    private double roundTime(final Cloudlet cloudlet, final double time) {
+        if(time - cloudlet.getExecStartTime() < 1){
+            return time;
+        }
+
+        final double startFraction = cloudlet.getExecStartTime() - (int) cloudlet.getExecStartTime();
+        return Math.round(time - startFraction);
+    }
+
 
     /**
      * Creates a Datacenter and its Hosts.
@@ -112,24 +140,14 @@ public class UFPelExample2 {
             hostList.add(host);
         }
 
-        final DatacenterSimple dc = new DatacenterSimple(simulation, hostList, new VmAllocationPolicySimple());
-        dc.setSchedulingInterval(SCHEDULING_INTERVAL);
-        return dc;
+        return new DatacenterSimple(cloudSim, hostList);
     }
 
     private Host createHost() {
         final List<Pe> peList = new ArrayList<>(HOST_PES);
         //List of Host's CPUs (Processing Elements, PEs)
-        IntStream.range(0, HOST_PES).forEach(i -> peList.add(new PeSimple(1000, new PeProvisionerSimple())));
-
-        final long ram = 8000; //in Megabytes
-        final long bw = 10000; //in Megabits/s
-        final long storage = 1000000; //in Megabytes
-        Host host = new HostSimple(ram, bw, storage, peList);
-        host
-            .setRamProvisioner(new ResourceProvisionerSimple())
-            .setBwProvisioner(new ResourceProvisionerSimple())
-            .setVmScheduler(new VmSchedulerTimeShared());
+        IntStream.range(0, HOST_PES).forEach(i -> peList.add(new PeSimple(HOST_PES_MIPS, new PeProvisionerSimple())));
+        Host host = new HostSimple(HOST_RAM, HOST_BW, HOST_STORAGE, peList);
         return host;
     }
 
@@ -139,29 +157,42 @@ public class UFPelExample2 {
     private List<Vm> createVms() {
         final List<Vm> list = new ArrayList<>(VMS);
         for (int i = 0; i < VMS; i++) {
-            Vm vm =
-                new VmSimple(i, VM_MIPS, VM_PES)
-                    .setRam(2000).setBw(2000).setSize(10000)
-                    .setCloudletScheduler(new CloudletSchedulerTimeShared());
-
+            //Uses a CloudletSchedulerTimeShared by default to schedule Cloudlets
+            final Vm vm = new VmSimple(VM_PES_MIPS, VM_PES, new CloudletSchedulerSpaceShared());
+            vm.setRam(VM_RAM);
+            vm.setBw(VM_BW);
+            vm.setSize(VM_STORAGE);
             list.add(vm);
         }
 
         return list;
     }
 
+    /**
+     * Creates a list of Cloudlets.
+     */
     private List<Cloudlet> createCloudlets() {
         final List<Cloudlet> list = new ArrayList<>(CLOUDLETS);
+
+        //UtilizationModel defining the Cloudlets use only 1% of any resource all the time
+        final UtilizationModelDynamic utilizationModel = new UtilizationModelDynamic(0.1);
+        
         for (int i = 0; i < CLOUDLETS; i++) {
-            Cloudlet cloudlet =
-                new CloudletSimple(i, CLOUDLET_LENGTH, CLOUDLET_PES)
-                    .setFileSize(1024)
-                    .setOutputSize(1024)
-                    .setUtilizationModelCpu(new UtilizationModelDynamic(0.5))
-                    .setUtilizationModelRam(new UtilizationModelDynamic(0.4));
+            final Cloudlet cloudlet = new CloudletSimple(CLOUDLET_LENGTH, CLOUDLET_PES, utilizationModel);
+            cloudlet.setSizes(1024);
             list.add(cloudlet);
         }
 
         return list;
+    }
+
+    /**
+     * Create network.
+     */
+    private void configureNetwork() {
+        //Configure network by mapping CloudSim entities
+        NetworkTopology networkTopology = new SimpleNetworkTopology();
+        cloudSim.setNetworkTopology(networkTopology);
+        networkTopology.addLink(broker, datacenter, 10, 1);
     }
 }
